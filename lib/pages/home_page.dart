@@ -123,7 +123,7 @@ class _HomePageState extends State<HomePage> {
       taskId = await _taskBox.add(newTask);
     }
 
-    if (dueDate != null && taskId != null) {
+    if (dueDate != null && taskId != null && dueDate.isAfter(DateTime.now())) {
       await NotificationService.scheduleNotification(
         id: taskId,
         title: title,
@@ -365,9 +365,7 @@ class _HomePageState extends State<HomePage> {
                           final pickedDate = await showDatePicker(
                             context: context,
                             initialDate: due ?? DateTime.now(),
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 30),
-                            ),
+                            firstDate: DateTime.now(),
                             lastDate: DateTime(2100),
                           );
                           if (pickedDate != null) {
@@ -499,7 +497,7 @@ class _HomePageState extends State<HomePage> {
       // 2. FIXED THE 'getExternalStoragePublicDirectory' ERROR
       // We will use getApplicationDocumentsDirectory for both platforms.
       // It's simpler, more reliable, and avoids many permission issues.
-      downloadsDir = await getApplicationDocumentsDirectory();
+      downloadsDir = await getDownloadsDirectory();
 
       if (downloadsDir == null) {
         if (mounted) {
