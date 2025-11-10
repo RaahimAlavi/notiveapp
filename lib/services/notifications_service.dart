@@ -87,7 +87,6 @@ class NotificationService {
     required DateTime dateTime,
   }) async {
     // 1. Convert the Dart DateTime to a TZDateTime
-    // This is crucial for zonedSchedule to work correctly.
     final scheduled = tz.TZDateTime.from(dateTime, tz.local);
 
     // 2. Schedule the notification

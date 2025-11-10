@@ -28,7 +28,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final Box<Task> _taskBox = Hive.box<Task>('tasksBox');
   final Box<Category> _categoryBox = Hive.box<Category>('categoriesBox');
-  // Make sure the order box is opened, use a late var
   late final Box<dynamic> _orderBox;
 
   int _currentIndex = 0;
@@ -51,10 +50,7 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // -----------------------------
   // Order box init & sync
-  // -----------------------------
-
   Future<List<int>> _getSavedOrder() async {
     final raw = _orderBox.get('order');
     if (raw == null) return [];
@@ -92,9 +88,7 @@ class _HomePageState extends State<HomePage> {
     await _orderBox.put('order', newOrder);
   }
 
-  // -----------------------------
   // Task CRUD
-  // -----------------------------
   Future<void> _addOrUpdateTask({
     Task? existing,
     required String title,
@@ -159,8 +153,6 @@ class _HomePageState extends State<HomePage> {
 
     await _syncOrderWithTasks();
 
-    // 2. FIX FOR CHECKBOX LAG
-    // Add setState to force the HomePage to rebuild
     if (mounted) setState(() {});
   }
 
@@ -178,14 +170,10 @@ class _HomePageState extends State<HomePage> {
       body: 'Your task "${task.title}" has been removed.',
     );
 
-    // 3. FIX FOR DELETE LAG
-    // Add setState to force the HomePage to rebuild
     if (mounted) setState(() {});
   }
 
-  // -----------------------------
   // Filtering & Sorting
-  // -----------------------------
   List<String> _getCategoryNames() {
     final categoryNames = _categoryBox.values.map((c) => c.name).toList();
     return ['All', ...categoryNames];
@@ -246,9 +234,7 @@ class _HomePageState extends State<HomePage> {
     return list;
   }
 
-  // -----------------------------
   // Task Sheet (Add/Edit)
-  // -----------------------------
   Future<void> _showTaskSheet({Task? task}) async {
     final availableCategories = _getCategoryNames()
         .where((c) => c != 'All')
@@ -262,7 +248,7 @@ class _HomePageState extends State<HomePage> {
     DateTime? due = task?.dueDate;
     int priority = task?.priority ?? 1;
 
-    // Check if the current category still exists, if not, reset
+    // Check if the current category still exists, if not then reset
     if (!availableCategories.contains(category) &&
         availableCategories.isNotEmpty) {
       category = availableCategories.first;
@@ -288,7 +274,6 @@ class _HomePageState extends State<HomePage> {
           child: StatefulBuilder(
             builder: (context, setState) {
               final colorScheme = Theme.of(context).colorScheme;
-              // Re-fetch categories in case one was added/deleted
               final currentCategories = _getCategoryNames()
                   .where((c) => c != 'All')
                   .toList();
@@ -449,21 +434,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // -----------------------------
-  // Backup / Import helpers
-  // -----------------------------
+  // Backup and Import helpers
   Future<void> _doExport() async {
     try {
-      // 4. FIX FOR BACKUP: Request permission first
       var status = await Permission.storage.request();
 
-      // Handle new Android 13+ "granular" permissions
       if (Platform.isAndroid &&
           (await Permission.photos.isDenied ||
               await Permission.videos.isDenied ||
               await Permission.audio.isDenied)) {
-        // This is a common workaround. Requesting a specific media type often
-        // triggers the broader "Media" permission dialog.
         status = await Permission.photos.request();
       }
 
@@ -492,11 +471,7 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      // 5. FIX FOR BACKUP: Use a more reliable path
       Directory? downloadsDir;
-      // 2. FIXED THE 'getExternalStoragePublicDirectory' ERROR
-      // We will use getApplicationDocumentsDirectory for both platforms.
-      // It's simpler, more reliable, and avoids many permission issues.
       downloadsDir = await getDownloadsDirectory();
 
       if (downloadsDir == null) {

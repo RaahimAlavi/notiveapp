@@ -9,20 +9,16 @@ import 'package:notiveapp/util/theme_provider.dart';
 import 'package:notiveapp/services/notifications_service.dart';
 
 Future<void> main() async {
-  // 1. Ensure bindings are ready *before* anything else
   WidgetsFlutterBinding.ensureInitialized();
   print("🔔 Initializing Notification Service...");
 
-  // 2. Initialize notifications (MUST come before runApp)
   await NotificationService.init();
   print("✅ Notification Service Initialized!");
 
-  // 3. Load theme preferences
   final prefs = await SharedPreferences.getInstance();
   final isDark = prefs.getBool('isDarkMode') ?? false;
   final int seed = prefs.getInt('colorSeed') ?? Colors.deepPurple.value;
 
-  // 4. Start the app
   runApp(MyApp(isDark: isDark, seed: seed));
 }
 
