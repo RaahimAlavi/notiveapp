@@ -8,9 +8,9 @@ A clean, modern, and offline-first task management application built with Flutte
 </p>
 
 <p align="center">
-<img src="https://www.google.com/search?q=https://img.shields.io/badge/Platform-Android_%257C_iOS-blue.svg" alt="Platform">
-<img src="https://www.google.com/search?q=https://img.shields.io/badge/Built%2520with-Flutter-02569B%3Flogo%3Dflutter" alt="Built with Flutter">
-<img src="https://www.google.com/search?q=https://img.shields.io/badge/License-MIT-green.svg" alt="License">
+<img src="https://img.shields.io/badge/Platform-Android_%7C_iOS-blue.svg" alt="Platform">
+<img src="https://img.shields.io/badge/Built%20with-Flutter-02569B?logo=flutter" alt="Built with Flutter">
+<img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
 </p>
 
 📱 About The Project
