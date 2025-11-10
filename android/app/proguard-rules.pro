@@ -1,4 +1,9 @@
-# Flutter local notifications plugin rules
--keep class com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver { *; }
--keep class com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver { *; }
--keep class com.dexterous.flutterlocalnotifications.models.** { *; }
+# --- Fix Missing type parameter bug ---
+-keepattributes Signature
+-keepclassmembers class * {
+    @androidx.annotation.Keep *;
+}
+
+# --- Keep flutter_local_notifications internals ---
+-keep class com.dexterous.flutterlocalnotifications.** { *; }
+-dontwarn com.dexterous.flutterlocalnotifications.**
