@@ -1,14 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions -->
+    <!-- Permissions for Notifications -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- Permissions for Backup/Import -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- Permissions for Android 13+ (Tiramisu) for granular media access -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <application
         android:label="notiveapp"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true"> 
 
         <activity
             android:name=".MainActivity"
@@ -20,7 +28,6 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
 
-            <!-- Initial splash theme while Flutter loads -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
@@ -31,24 +38,21 @@
             </intent-filter>
         </activity>
 
-        <!-- This must be defined so Flutter knows what embedding to use -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- Firebase (optional, safe to keep if you use FCM later) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="daily_reminder_channel" />
 
-        <!-- Flutter Local Notifications default channel (optional but recommended) -->
         <meta-data
             android:name="com.dexterous.flutterlocalnotifications.DefaultChannelId"
             android:value="reminder_channel" />
 
     </application>
 
-    <!-- For Flutter's text processing plugin -->
+
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />

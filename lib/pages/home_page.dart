@@ -28,7 +28,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final Box<Task> _taskBox = Hive.box<Task>('tasksBox');
   final Box<Category> _categoryBox = Hive.box<Category>('categoriesBox');
-  Box<dynamic>? _orderBox;
+  // Make sure the order box is opened, use a late var
+  late final Box<dynamic> _orderBox;
 
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
@@ -39,7 +40,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _initOrderBox();
+    // Assign the opened box
+    _orderBox = Hive.box('taskOrderBox');
+    _syncOrderWithTasks();
   }
 
   @override
@@ -48,19 +51,12 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // Order box sync
-  Future<void> _initOrderBox() async {
-    if (!Hive.isBoxOpen('taskOrderBox')) {
-      await Hive.openBox('taskOrderBox');
-    }
-    _orderBox = Hive.box('taskOrderBox');
-    await _syncOrderWithTasks();
-    if (mounted) setState(() {});
-  }
+  // -----------------------------
+  // Order box init & sync
+  // -----------------------------
 
   Future<List<int>> _getSavedOrder() async {
-    if (_orderBox == null) return [];
-    final raw = _orderBox!.get('order');
+    final raw = _orderBox.get('order');
     if (raw == null) return [];
     try {
       return (raw as List).map((e) => e as int).toList();
@@ -70,8 +66,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _syncOrderWithTasks() async {
-    if (_orderBox == null) return;
-
     final currentIncompleteKeys = _taskBox.keys
         .where((k) {
           final t = _taskBox.get(k);
@@ -91,17 +85,16 @@ class _HomePageState extends State<HomePage> {
         .toList();
     final newOrder = [...pruned, ...missing];
 
-    await _orderBox!.put('order', newOrder);
+    await _orderBox.put('order', newOrder);
   }
 
   Future<void> _saveOrderList(List<int> newOrder) async {
-    if (_orderBox == null) {
-      await _initOrderBox();
-    }
-    await _orderBox!.put('order', newOrder);
+    await _orderBox.put('order', newOrder);
   }
 
+  // -----------------------------
   // Task CRUD
+  // -----------------------------
   Future<void> _addOrUpdateTask({
     Task? existing,
     required String title,
@@ -139,7 +132,6 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // Keep order box in sync new task will be append
     await _syncOrderWithTasks();
     if (mounted) setState(() {});
   }
@@ -165,9 +157,10 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // Update order
     await _syncOrderWithTasks();
 
+    // 2. FIX FOR CHECKBOX LAG
+    // Add setState to force the HomePage to rebuild
     if (mounted) setState(() {});
   }
 
@@ -176,22 +169,23 @@ class _HomePageState extends State<HomePage> {
     final removedKey = task.key as int;
     await task.delete();
 
-    // remove from saved order
-    if (_orderBox != null) {
-      final saved = await _getSavedOrder();
-      final newOrder = saved.where((k) => k != removedKey).toList();
-      await _saveOrderList(newOrder);
-    }
+    final saved = await _getSavedOrder();
+    final newOrder = saved.where((k) => k != removedKey).toList();
+    await _saveOrderList(newOrder);
 
     await NotificationService.showInstantNotification(
       title: 'Task Deleted',
       body: 'Your task "${task.title}" has been removed.',
     );
 
+    // 3. FIX FOR DELETE LAG
+    // Add setState to force the HomePage to rebuild
     if (mounted) setState(() {});
   }
 
-  // Sorting
+  // -----------------------------
+  // Filtering & Sorting
+  // -----------------------------
   List<String> _getCategoryNames() {
     final categoryNames = _categoryBox.values.map((c) => c.name).toList();
     return ['All', ...categoryNames];
@@ -216,7 +210,6 @@ class _HomePageState extends State<HomePage> {
 
     switch (_sortOption) {
       case SortOption.created:
-        // newest first
         list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         break;
       case SortOption.dueDate:
@@ -235,8 +228,7 @@ class _HomePageState extends State<HomePage> {
         );
         break;
       case SortOption.custom:
-        final savedOrder =
-            (_orderBox?.get('order') as List?)?.cast<int>() ?? [];
+        final savedOrder = _orderBox.get('order') as List<int>? ?? [];
         if (savedOrder.isNotEmpty) {
           final map = {for (var t in list) (t.key as int): t};
           final ordered = <Task>[];
@@ -254,7 +246,9 @@ class _HomePageState extends State<HomePage> {
     return list;
   }
 
+  // -----------------------------
   // Task Sheet (Add/Edit)
+  // -----------------------------
   Future<void> _showTaskSheet({Task? task}) async {
     final availableCategories = _getCategoryNames()
         .where((c) => c != 'All')
@@ -267,6 +261,14 @@ class _HomePageState extends State<HomePage> {
             : 'General');
     DateTime? due = task?.dueDate;
     int priority = task?.priority ?? 1;
+
+    // Check if the current category still exists, if not, reset
+    if (!availableCategories.contains(category) &&
+        availableCategories.isNotEmpty) {
+      category = availableCategories.first;
+    } else if (availableCategories.isEmpty) {
+      category = 'General';
+    }
 
     await showModalBottomSheet(
       context: context,
@@ -286,13 +288,14 @@ class _HomePageState extends State<HomePage> {
           child: StatefulBuilder(
             builder: (context, setState) {
               final colorScheme = Theme.of(context).colorScheme;
+              // Re-fetch categories in case one was added/deleted
               final currentCategories = _getCategoryNames()
                   .where((c) => c != 'All')
                   .toList();
               if (!currentCategories.contains(category) &&
                   currentCategories.isNotEmpty) {
                 category = currentCategories.first;
-              } else if (currentCategories.isEmpty && category.isEmpty) {
+              } else if (currentCategories.isEmpty) {
                 category = 'General';
               }
 
@@ -322,7 +325,7 @@ class _HomePageState extends State<HomePage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: colorScheme.surfaceVariant,
+                      fillColor: colorScheme.surfaceVariant.withOpacity(0.5),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -336,15 +339,15 @@ class _HomePageState extends State<HomePage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: colorScheme.surfaceVariant,
+                      fillColor: colorScheme.surfaceVariant.withOpacity(0.5),
                     ),
                     items: currentCategories
                         .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                         .toList(),
                     onChanged: (v) => setState(() => category = v ?? category),
                     hint: currentCategories.isEmpty
-                        ? const Text('No categories')
-                        : null,
+                        ? const Text('No categories (uses "General")')
+                        : const Text('Select a category'),
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -362,13 +365,14 @@ class _HomePageState extends State<HomePage> {
                           final pickedDate = await showDatePicker(
                             context: context,
                             initialDate: due ?? DateTime.now(),
-                            firstDate: DateTime.now(),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 30),
+                            ),
                             lastDate: DateTime(2100),
                           );
                           if (pickedDate != null) {
                             final pickedTime = await showTimePicker(
                               context: context,
-                              // make sure a non-null DateTime is given
                               initialTime: TimeOfDay.fromDateTime(
                                 due ?? DateTime.now(),
                               ),
@@ -447,41 +451,81 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // -----------------------------
   // Backup / Import helpers
+  // -----------------------------
   Future<void> _doExport() async {
     try {
-      Directory? downloadsDir;
-      if (Platform.isAndroid) {
-        // Request permissions for Android
-        if (await Permission.storage.request().isGranted ||
-            await Permission.manageExternalStorage.request().isGranted) {
-          downloadsDir = Directory(
-            '/storage/emulated/0/Download/NotiveBackups',
-          );
-        } else {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Storage permission denied. Cannot export.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-          return;
-        }
-      } else {
-        downloadsDir = await getApplicationDocumentsDirectory();
+      // 4. FIX FOR BACKUP: Request permission first
+      var status = await Permission.storage.request();
+
+      // Handle new Android 13+ "granular" permissions
+      if (Platform.isAndroid &&
+          (await Permission.photos.isDenied ||
+              await Permission.videos.isDenied ||
+              await Permission.audio.isDenied)) {
+        // This is a common workaround. Requesting a specific media type often
+        // triggers the broader "Media" permission dialog.
+        status = await Permission.photos.request();
       }
 
-      if (!await downloadsDir.exists()) {
-        await downloadsDir.create(recursive: true);
+      if (status.isPermanentlyDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Storage permission is permanently denied. Please enable it in app settings.',
+              ),
+            ),
+          );
+        }
+        await openAppSettings();
+        return;
+      }
+
+      if (status.isDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Storage permission is required to export data.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 5. FIX FOR BACKUP: Use a more reliable path
+      Directory? downloadsDir;
+      // 2. FIXED THE 'getExternalStoragePublicDirectory' ERROR
+      // We will use getApplicationDocumentsDirectory for both platforms.
+      // It's simpler, more reliable, and avoids many permission issues.
+      downloadsDir = await getApplicationDocumentsDirectory();
+
+      if (downloadsDir == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not find Downloads directory.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final backupDir = Directory('${downloadsDir.path}/NotiveBackups');
+
+      if (!await backupDir.exists()) {
+        await backupDir.create(recursive: true);
       }
 
       final jsonPath = await BackupService.exportTasksToJson();
       final srcFile = File(jsonPath);
       final destFile = File(
-        '${downloadsDir.path}/notive_backup_${DateTime.now().millisecondsSinceEpoch}.json',
+        '${backupDir.path}/notive_backup_${DateTime.now().millisecondsSinceEpoch}.json',
       );
       await srcFile.copy(destFile.path);
+      // Delete the temporary file
+      await srcFile.delete();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -504,6 +548,40 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _doImport() async {
     try {
+      // 6. FIX FOR IMPORT: Request permission first
+      var status = await Permission.storage.request();
+      if (Platform.isAndroid &&
+          (await Permission.photos.isDenied ||
+              await Permission.videos.isDenied ||
+              await Permission.audio.isDenied)) {
+        status = await Permission.photos.request();
+      }
+
+      if (status.isPermanentlyDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Storage permission is permanently denied. Please enable it in app settings.',
+              ),
+            ),
+          );
+        }
+        await openAppSettings();
+        return;
+      }
+
+      if (status.isDenied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Storage permission is required to import data.'),
+            ),
+          );
+        }
+        return;
+      }
+
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
@@ -522,6 +600,8 @@ class _HomePageState extends State<HomePage> {
       );
 
       await _syncOrderWithTasks();
+      // Force refresh after import
+      if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -533,49 +613,55 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Main scaffold
+  // -----------------------------
+  // Main scaffold with bottom nav
+  // -----------------------------
   @override
   Widget build(BuildContext context) {
-    // Get the theme
-    final themeProvider = Provider.of<ThemeProvider>(context);
     final cs = Theme.of(context).colorScheme;
+    // 3. Get the theme provider
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
 
+    // 4. THIS IS THE FULLY CORRECTED TABS LIST
     final tabs = <Widget>[
-      // Tasks tab
+      // --- TasksTab ---
       TasksTab(
         taskBox: _taskBox,
         categoryBox: _categoryBox,
+        // Pass the functions from this state
         getCategoryNames: _getCategoryNames,
         applyFiltersAndSort: _applyFiltersAndSort,
         toggleCompletion: _toggleCompletion,
         deleteTask: _deleteTask,
-        showTaskSheet: _showTaskSheet,
+        showTaskSheet: ({Task? task}) => _showTaskSheet(task: task),
         getSavedOrder: _getSavedOrder,
         saveOrderList: _saveOrderList,
-        initOrderBox: _initOrderBox,
+        initOrderBox: _syncOrderWithTasks, // Re-syncing is fine here
+        // Pass the state values
         searchController: _searchController,
         filterCategory: _filterCategory,
         sortOption: _sortOption,
         query: _query,
-        onSearchChanged: (v) => setState(() => _query = v),
-        onFilterChanged: (c) => setState(() => _filterCategory = c),
-        onSortChanged: (o) => setState(() => _sortOption = o),
+        // Pass the state-setting callbacks
+        onSearchChanged: (value) => setState(() => _query = value),
+        onFilterChanged: (value) => setState(() => _filterCategory = value),
+        onSortChanged: (value) => setState(() => _sortOption = value),
       ),
-
-      // Completed tab
+      // --- CompletedTab ---
       CompletedTab(
         taskBox: _taskBox,
         applyFiltersAndSort: _applyFiltersAndSort,
         toggleCompletion: _toggleCompletion,
         deleteTask: _deleteTask,
-        showTaskSheet: _showTaskSheet,
+        showTaskSheet: ({Task? task}) => _showTaskSheet(task: task),
       ),
-
-      // Settings tab
+      // --- SettingsTab ---
       SettingsTab(
+        // Get values from the theme provider
         isDarkMode: themeProvider.isDarkMode,
         onToggleTheme: themeProvider.toggleTheme,
         onChangeSeed: themeProvider.setSeedColor,
+        // Pass backup functions
         doExport: _doExport,
         doImport: _doImport,
       ),
@@ -598,16 +684,14 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.file_download_outlined),
             onPressed: _doImport,
           ),
-          IconButton(
-            // Use theme provider to build the icon and action
-            icon: Icon(
-              themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
-            ),
-            onPressed: themeProvider.toggleTheme,
-          ),
+          // Theme toggle is now in SettingsTab
         ],
       ),
-      body: SafeArea(child: tabs[_currentIndex]),
+      body: SafeArea(
+        // This is efficient! It just swaps which widget to show.
+        // The ValueListenablBuilders *inside* the tabs will handle live updates.
+        child: IndexedStack(index: _currentIndex, children: tabs),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showTaskSheet(),
         icon: const Icon(Icons.add),
@@ -615,6 +699,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
       ),
+      // This whole bottom part is rebuilt when _currentIndex changes
       bottomNavigationBar: NavigationBar(
         height: 64,
         selectedIndex: _currentIndex,
