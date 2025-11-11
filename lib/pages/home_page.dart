@@ -521,7 +521,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _doImport() async {
     try {
-      // 6. FIX FOR IMPORT: Request permission first
+      // 6. Request permission first
       var status = await Permission.storage.request();
       if (Platform.isAndroid &&
           (await Permission.photos.isDenied ||
@@ -573,7 +573,6 @@ class _HomePageState extends State<HomePage> {
       );
 
       await _syncOrderWithTasks();
-      // Force refresh after import
       if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
@@ -586,22 +585,19 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // -----------------------------
   // Main scaffold with bottom nav
-  // -----------------------------
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // 3. Get the theme provider
+    // 3. theme provider
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
 
-    // 4. THIS IS THE FULLY CORRECTED TABS LIST
+    // 4. TABS LIST
     final tabs = <Widget>[
-      // --- TasksTab ---
+      // TasksTab
       TasksTab(
         taskBox: _taskBox,
         categoryBox: _categoryBox,
-        // Pass the functions from this state
         getCategoryNames: _getCategoryNames,
         applyFiltersAndSort: _applyFiltersAndSort,
         toggleCompletion: _toggleCompletion,
@@ -609,18 +605,16 @@ class _HomePageState extends State<HomePage> {
         showTaskSheet: ({Task? task}) => _showTaskSheet(task: task),
         getSavedOrder: _getSavedOrder,
         saveOrderList: _saveOrderList,
-        initOrderBox: _syncOrderWithTasks, // Re-syncing is fine here
-        // Pass the state values
+        initOrderBox: _syncOrderWithTasks,
         searchController: _searchController,
         filterCategory: _filterCategory,
         sortOption: _sortOption,
         query: _query,
-        // Pass the state-setting callbacks
         onSearchChanged: (value) => setState(() => _query = value),
         onFilterChanged: (value) => setState(() => _filterCategory = value),
         onSortChanged: (value) => setState(() => _sortOption = value),
       ),
-      // --- CompletedTab ---
+      // CompletedTab
       CompletedTab(
         taskBox: _taskBox,
         applyFiltersAndSort: _applyFiltersAndSort,
@@ -628,13 +622,11 @@ class _HomePageState extends State<HomePage> {
         deleteTask: _deleteTask,
         showTaskSheet: ({Task? task}) => _showTaskSheet(task: task),
       ),
-      // --- SettingsTab ---
+      // SettingsTab
       SettingsTab(
-        // Get values from the theme provider
         isDarkMode: themeProvider.isDarkMode,
         onToggleTheme: themeProvider.toggleTheme,
         onChangeSeed: themeProvider.setSeedColor,
-        // Pass backup functions
         doExport: _doExport,
         doImport: _doImport,
       ),
@@ -657,12 +649,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.file_download_outlined),
             onPressed: _doImport,
           ),
-          // Theme toggle is now in SettingsTab
         ],
       ),
       body: SafeArea(
-        // This is efficient! It just swaps which widget to show.
-        // The ValueListenablBuilders *inside* the tabs will handle live updates.
         child: IndexedStack(index: _currentIndex, children: tabs),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -672,7 +661,6 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
       ),
-      // This whole bottom part is rebuilt when _currentIndex changes
       bottomNavigationBar: NavigationBar(
         height: 64,
         selectedIndex: _currentIndex,
