@@ -654,13 +654,15 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: IndexedStack(index: _currentIndex, children: tabs),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showTaskSheet(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Task'),
-        backgroundColor: cs.primary,
-        foregroundColor: cs.onPrimary,
-      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: () => _showTaskSheet(),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Task'),
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
+            )
+          : null,
       bottomNavigationBar: NavigationBar(
         height: 64,
         selectedIndex: _currentIndex,
